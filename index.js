@@ -90,8 +90,9 @@ if (process.argv[2] == 'client') {
 } else if (process.argv[2] == 'run') {
   async.each(Object.keys(config.remotes), function (remoteAddr, next) {
     var d = dnode.connect(remoteAddr.split(':')[0], Number(remoteAddr.split(':')[1]));
-    setTimeout(function () {
-      if (!d.stream.destroyed) {
+    var connected = false;
+    setTimeout(function () { // TODO stream timeout preferrable
+      if (!connected) {
         d.emit('error', new Error('Timeout'));
         d.end();
         next(new Error('Timeout'));
@@ -101,6 +102,7 @@ if (process.argv[2] == 'client') {
       console.error('ERR'.red, remoteAddr, '-', err.message);
     })
     d.on('remote', function (remote) {
+      connected = true;
       console.log('YAY'.green, remoteAddr, '- connected!');
       remote.debug('executing ' + JSON.stringify(process.argv[3]) + ' for ' + myIP(null,true));
       try {
