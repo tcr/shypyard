@@ -1,0 +1,23 @@
+{
+  "name": "shypyard",
+  "version": "0.1.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "shypyard": "index.js",
+    "node-shypyard": "index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "bluebird": "~1.0.0",
+    "forever": "~0.10.11",
+    "osenv": "0.0.3",
+    "my-ip": "~1.1.0",
+    "colors": "~0.6.2",
+    "async": "~0.2.9"
+  }
+}
