@@ -55,7 +55,7 @@ var config = getConfig();
 config.remotes || (config.remotes = {});
 
 if (process.argv[2] == 'client') {
-  require('forever').start(__dirname + '/client.' + (process.platform == 'win32' ? 'cmd' : 'js'), {});
+  require('forever').start(__dirname + '/client.js', {});
 } else if (process.argv[2] == 'remote') {
   if (process.argv[3] == 'add' && process.argv[4].match(/^.+:\d+$/)) {
     var remote = process.argv[4];

@@ -14,11 +14,12 @@
   "license": "ISC",
   "dependencies": {
     "bluebird": "~1.0.0",
-    "forever": "~0.10.11",
+    "forever": "0.10.0",
     "osenv": "0.0.3",
     "my-ip": "~1.1.0",
     "colors": "~0.6.2",
     "async": "~0.2.9",
-    "dnode": "~1.2.0"
+    "dnode": "~1.2.0",
+    "node-shyp": "~0.1.6"
   }
 }
