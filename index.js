@@ -97,10 +97,16 @@ if (process.argv[2] == 'client') {
       console.log('YAY'.green, remoteAddr, '- connected!');
       remote.debug('executing ' + JSON.stringify(process.argv[3]) + ' for ' + myIP(null,true));
       try {
-        var name = require(path.join(process.cwd(), 'package.json')).name
+        var pkg = require(path.join(process.cwd(), 'package.json'));
       } catch (e) {
         throw new Error('Could not load package.json for current directory.');
       }
+      var repo = pkg.repository.url || pkg.repository || '';
+      if (!repo) {
+        throw new Error('No repository listed in package.json, please add and try again.');
+      }
+      var name = path.basename(repo, '.git');
+
       remote.load(name, null, function (err) {
         if (err) {
           console.log('   ', config.remotes[remoteAddr], '[' + remoteAddr + ']  ... ', 'FAILED'.red, err);
