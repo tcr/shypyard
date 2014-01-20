@@ -10,6 +10,12 @@ shyp.target = function (next) {
 	next(null, process.platform + '-' + process.arch);
 }
 
+
+if (process.argv.length > 2) {
+	console.error('starting in', process.argv[2]);
+	process.chdir(process.argv[2]);
+}
+
 var startcwd = process.cwd();
 
 shyp.load = function (name, repo, next) {
@@ -21,6 +27,7 @@ shyp.load = function (name, repo, next) {
 	}
 };
 
+var port = 5004;
 var server = dnode(shyp);
-server.listen(5004);
-console.error('Listening on port 5004');
+server.listen(port);
+console.error('listening on port ' + port);

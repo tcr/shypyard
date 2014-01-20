@@ -56,7 +56,9 @@ var config = getConfig();
 config.remotes || (config.remotes = {});
 
 if (process.argv[2] == 'client') {
-  require('forever').start(__dirname + '/client.js', {});
+  require('forever').start(__dirname + '/client.js', {
+    options: process.argv.slice(3)
+  });
 } else if (process.argv[2] == 'remote') {
   if (process.argv[3] == 'add') {
     if (!process.argv[4].match(/^.+:\d+$/)) {
@@ -103,7 +105,7 @@ if (process.argv[2] == 'client') {
     })
     d.on('remote', function (remote) {
       connected = true;
-      console.log('YAY'.green, remoteAddr, '- connected!');
+      console.log('YAY'.green,  config.remotes[remoteAddr], '[' + remoteAddr + ']', '- connected!');
       remote.debug('executing ' + JSON.stringify(process.argv[3]) + ' for ' + myIP(null,true));
       try {
         var pkg = require(path.join(process.cwd(), 'package.json'));
@@ -132,6 +134,9 @@ if (process.argv[2] == 'client') {
         }, function (code, stdout, stderr) {
           console.log('   ', config.remotes[remoteAddr], '[' + remoteAddr + ']  ... ', (code ? 'FAILED'.red + ' with error code ' + code : 'SUCCESS'.green));
           d.end();
+          if (code) {
+            console.log('      >', String(stderr).replace(/\n/g, '\n      > '));
+          }
           next(code);
         });
       });
