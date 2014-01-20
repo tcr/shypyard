@@ -6,6 +6,7 @@ var fs = require('fs');
 var myIP = require('my-ip');
 var colors = require('colors');
 var async = require('async');
+var path = require('path');
 
 function simpleStream () {
   var s = new stream.Duplex
@@ -57,11 +58,18 @@ config.remotes || (config.remotes = {});
 if (process.argv[2] == 'client') {
   require('forever').start(__dirname + '/client.js', {});
 } else if (process.argv[2] == 'remote') {
-  if (process.argv[3] == 'add' && process.argv[4].match(/^.+:\d+$/)) {
+  if (process.argv[3] == 'add') {
+    if (!process.argv[4].match(/^.+:\d+$/)) {
+      console.error('ERR'.red, 'Invalid host:port combination.');
+      process.exit(1);
+    }
+    
     var remote = process.argv[4];
     console.log('Detecting remote...');
     var d = dnode.connect(remote.split(':')[0], Number(remote.split(':')[1]));
+    var connected = null;
     d.on('remote', function (remote) {
+      clearTimeout(connected);
       remote.target(function (err, target) {
         console.log('Remote is', target);
         config.remotes[process.argv[4]] = process.argv[5] || target || process.argv[4];
@@ -70,6 +78,10 @@ if (process.argv[2] == 'client') {
         d.end();
       });
     });
+    connected = setTimeout(function () {
+      console.error('ERR'.red, '10s timeout elapsed, quitting.')
+      process.exit(1);
+    }, 10*1000)
   } else {
     Object.keys(config.remotes).forEach(function (remote) {
       console.log(remote, '\t', config.remotes[remote]);
@@ -78,20 +90,35 @@ if (process.argv[2] == 'client') {
 } else if (process.argv[2] == 'run') {
   async.each(Object.keys(config.remotes), function (remoteAddr, next) {
     var d = dnode.connect(remoteAddr.split(':')[0], Number(remoteAddr.split(':')[1]));
+    d.on('error', function (err) {
+      console.error('ERR'.red, remoteAddr, '-', err.message);
+    })
     d.on('remote', function (remote) {
-      console.log('connected to', remoteAddr);
+      console.log('YAY'.green, remoteAddr, '- connected!');
       remote.debug('executing ' + JSON.stringify(process.argv[3]) + ' for ' + myIP(null,true));
-      remote[process.argv[3]](process.argv.slice(4), {
-        verbose: true,
-        // verbose: {
-        //   stdout: dnodeStream(process.stdout),
-        //   stderr: dnodeStream(process.stderr)
-        // },
-        encoding: 'utf-8'
-      }, function (code, stdout, stderr) {
-        console.log('   ', config.remotes[remoteAddr], '[' + remoteAddr + ']  ... ', (code ? 'FAILED'.red + ' with error code ' + code : 'SUCCESS'.green));
-        d.end();
-        next(code);
+      try {
+        var name = require(path.join(process.cwd(), 'package.json')).name
+      } catch (e) {
+        throw new Error('Could not load package.json for current directory.');
+      }
+      remote.load(name, null, function (err) {
+        if (err) {
+          console.log('   ', config.remotes[remoteAddr], '[' + remoteAddr + ']  ... ', 'FAILED'.red, err);
+          return;
+        }
+
+        remote[process.argv[3]](process.argv.slice(4), {
+          verbose: true,
+          // verbose: {
+          //   stdout: dnodeStream(process.stdout),
+          //   stderr: dnodeStream(process.stderr)
+          // },
+          encoding: 'utf-8'
+        }, function (code, stdout, stderr) {
+          console.log('   ', config.remotes[remoteAddr], '[' + remoteAddr + ']  ... ', (code ? 'FAILED'.red + ' with error code ' + code : 'SUCCESS'.green));
+          d.end();
+          next(code);
+        });
       });
     });
   }, function (err) {
