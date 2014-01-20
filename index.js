@@ -90,6 +90,13 @@ if (process.argv[2] == 'client') {
 } else if (process.argv[2] == 'run') {
   async.each(Object.keys(config.remotes), function (remoteAddr, next) {
     var d = dnode.connect(remoteAddr.split(':')[0], Number(remoteAddr.split(':')[1]));
+    setTimeout(function () {
+      if (!d.stream.destroyed) {
+        d.emit('error', new Error('Timeout'));
+        d.end();
+        next(new Error('Timeout'));
+      }
+    }, 5000);
     d.on('error', function (err) {
       console.error('ERR'.red, remoteAddr, '-', err.message);
     })
