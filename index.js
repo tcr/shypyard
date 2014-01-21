@@ -96,19 +96,21 @@ if (process.argv[2] == 'client') {
     })
   }
 } else if (process.argv[2] == 'run') {
-  try {
-    var pkg = require(path.join(process.cwd(), 'package.json'));
-  } catch (e) {
-    throw new Error('Could not load package.json for current directory.');
-  }
-  var repo = pkg.repository.url || pkg.repository || '';
-  if (!repo) {
-    throw new Error('No repository listed in package.json, please add and try again.');
-  }
-  var name = path.basename(repo, '.git');
+  if (process.argv[3] != 'update') {
+    try {
+      var pkg = require(path.join(process.cwd(), 'package.json'));
+    } catch (e) {
+      throw new Error('Could not load package.json for current directory.');
+    }
+    var repo = pkg.repository.url || pkg.repository || '';
+    if (!repo) {
+      throw new Error('No repository listed in package.json, please add and try again.');
+    }
+    var name = path.basename(repo, '.git');
 
-  console.log('    building ' + repo);
-  console.log('');
+    console.log('    running against ' + repo);
+    console.log('');
+  }
 
   async.each(Object.keys(config.remotes), function (remoteAddr, next) {
     var d = dnode.connect(remoteAddr.split(':')[0], Number(remoteAddr.split(':')[1]));
@@ -127,37 +129,64 @@ if (process.argv[2] == 'client') {
       console.error('ERR'.red, prefix, err.message);
     })
     d.on('remote', function (remote) {
+      console.log('   ', prefix, 'connected to ' + remoteAddr);
+      connected = true;
       process.on('SIGINT', function() {
         remote.choke();
       });
-    
-      connected = true;
-      console.log('   ', prefix, 'connected to ' + remoteAddr);
       remote.debug('executing ' + JSON.stringify(process.argv[3]) + ' for ' + myIP(null,true));
-      git('log', ['--pretty=format:\'%h\'', '-n', '1'], {}, function (err, stdout, stderr) {
-        remote.load(name, null, String(stdout).replace(/^[\n\s]+|[\n\s]+$/g, ''), function (err) {
-          if (err) {
-            console.log('ERR'.red, prefix, 'error loading module:', err);
-            return;
-          }
 
-          remote[process.argv[3]](process.argv.slice(4), {
-            verbose: true,
-            // verbose: {
-            //   stdout: dnodeStream(process.stdout),
-            //   stderr: dnodeStream(process.stderr)
-            // },
-            encoding: 'utf-8'
-          }, function (code, stdout, stderr) {
-            console.log((code ? 'ERR'.red : 'YAY'.green), prefix, (code ? ('FAILED with error code ' + code).red : 'success!'.green));
-            d.end();
-            if (code) {
-              console.log('    |', String(stderr).replace(/(\n?\s+)+$/, '').replace(/\n/g, '\n    | '));
+      if (!remote[process.argv[3]]) {
+        console.log('ERR'.red, 'No .' + process.argv[3] + '() function on remote client');
+        d.end();
+        next(new Error('No .update() function on remote client'));
+        return;
+      }
+
+      if (process.argv[3] == 'update') {
+        // no git repo needed
+        remote[process.argv[3]](process.argv.slice(4), {
+          verbose: true,
+          // verbose: {
+          //   stdout: dnodeStream(process.stdout),
+          //   stderr: dnodeStream(process.stderr)
+          // },
+          encoding: 'utf-8'
+        }, function (code, stdout, stderr) {
+          console.log((code ? 'ERR'.red : 'YAY'.green), prefix, (code ? ('FAILED with error code ' + code).red : 'success!'.green));
+          if (code) {
+            console.log('    |', String(stderr).replace(/(\n?\s+)+$/, '').replace(/\n/g, '\n    | '));
+          }
+          remote.choke();
+          next(code);
+        });
+
+      } else {
+        git('log', ['--pretty=format:\'%h\'', '-n', '1'], {}, function (err, stdout, stderr) {
+          remote.load(name, null, String(stdout).replace(/^[\n\s]+|[\n\s]+$/g, ''), function (err) {
+            if (err) {
+              console.log('ERR'.red, prefix, 'error loading module:', err);
+              return;
             }
-            next(code);
+
+            remote[process.argv[3]](process.argv.slice(4), {
+              verbose: true,
+              // verbose: {
+              //   stdout: dnodeStream(process.stdout),
+              //   stderr: dnodeStream(process.stderr)
+              // },
+              encoding: 'utf-8'
+            }, function (code, stdout, stderr) {
+              console.log((code ? 'ERR'.red : 'YAY'.green), prefix, (code ? ('FAILED with error code ' + code).red : 'success!'.green));
+              d.end();
+              if (code) {
+                console.log('    |', String(stderr).replace(/(\n?\s+)+$/, '').replace(/\n/g, '\n    | '));
+              }
+              next(code);
+            });
           });
         });
-      })
+      }
     });
   }, function (err) {
     process.on('exit', function () {

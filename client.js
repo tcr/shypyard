@@ -13,16 +13,12 @@ shyp.target = function (next) {
 
 shyp.choke = function () {
 	// Die intentionally
+  console.log('time to choke :(')
 	process.exit(1);
 }
 
 shyp.update = function (args, opts, next) {
-  console.log('running the thing')
-  console.log(arguments);
-  cmd('npm', ['install', '-g', 'shypyard'], opts, function (err, stdout, stderr) {
-    console.log('whaaat')
-    setTimeout(process.exit, 1);
-  })
+  cmd('npm', ['install', '-g', 'shypyard'], opts, next);
 }
 
 
