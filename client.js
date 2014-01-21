@@ -11,6 +11,10 @@ shyp.target = function (next) {
 	next(null, process.platform + '-' + process.arch);
 }
 
+shyp.version = function (next) {
+  next(null, require('./package.json').version);
+}
+
 shyp.choke = function () {
 	// Die intentionally
   console.log('time to choke :(')

@@ -153,12 +153,23 @@ if (process.argv[2] == 'client') {
           // },
           encoding: 'utf-8'
         }, function (code, stdout, stderr) {
-          console.log((code ? 'ERR'.red : 'YAY'.green), prefix, (code ? ('FAILED with error code ' + code).red : 'success!'.green));
-          if (code) {
-            console.log('    |', String(stderr).replace(/(\n?\s+)+$/, '').replace(/\n/g, '\n    | '));
+          if (remote.version) {
+            remote.version(gotversion);
+          } else {
+            gotversion(null);
           }
-          remote.choke();
-          next(code);
+
+          gotversion(function (err, version) {
+            if (code) {
+              console.log('ERR'.red, 'FAILED with error code ' + code);
+              console.log('    |', String(stderr).replace(/(\n?\s+)+$/, '').replace(/\n/g, '\n    | '));
+            } else {
+              console.log('YAY'.green, prefix, 'success! version installed:', version ? version : '(null)');
+            }
+            
+            remote.choke();
+            next(code);
+          })
         });
 
       } else {
