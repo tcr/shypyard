@@ -7,6 +7,7 @@ var myIP = require('my-ip');
 var colors = require('colors');
 var async = require('async');
 var path = require('path');
+var cmd = require('./cmd')
 
 function simpleStream () {
   var s = new stream.Duplex
@@ -31,6 +32,11 @@ function dnodeStream (input) {
     s.pipe(input);
   }
   return s;
+}
+
+function git (type, args, opts, next)
+{
+  return cmd('git', [type].concat(args || []), opts, next);
 }
 
 function getConfig () {
@@ -90,6 +96,20 @@ if (process.argv[2] == 'client') {
     })
   }
 } else if (process.argv[2] == 'run') {
+  try {
+    var pkg = require(path.join(process.cwd(), 'package.json'));
+  } catch (e) {
+    throw new Error('Could not load package.json for current directory.');
+  }
+  var repo = pkg.repository.url || pkg.repository || '';
+  if (!repo) {
+    throw new Error('No repository listed in package.json, please add and try again.');
+  }
+  var name = path.basename(repo, '.git');
+
+  console.log('    building ' + repo);
+  console.log('');
+
   async.each(Object.keys(config.remotes), function (remoteAddr, next) {
     var d = dnode.connect(remoteAddr.split(':')[0], Number(remoteAddr.split(':')[1]));
     var connected = false;
@@ -100,50 +120,50 @@ if (process.argv[2] == 'client') {
         next(new Error('Timeout'));
       }
     }, 5000);
+
+    var prefix = config.remotes[remoteAddr].bold.white + '\t-'
+
     d.on('error', function (err) {
-      console.error('ERR'.red, remoteAddr, '-', err.message);
+      console.error('ERR'.red, prefix, err.message);
     })
     d.on('remote', function (remote) {
-      connected = true;
-      console.log('YAY'.green,  config.remotes[remoteAddr], '[' + remoteAddr + ']', '- connected!');
-      remote.debug('executing ' + JSON.stringify(process.argv[3]) + ' for ' + myIP(null,true));
-      try {
-        var pkg = require(path.join(process.cwd(), 'package.json'));
-      } catch (e) {
-        throw new Error('Could not load package.json for current directory.');
-      }
-      var repo = pkg.repository.url || pkg.repository || '';
-      if (!repo) {
-        throw new Error('No repository listed in package.json, please add and try again.');
-      }
-      var name = path.basename(repo, '.git');
-
-      remote.load(name, null, function (err) {
-        if (err) {
-          console.log('   ', config.remotes[remoteAddr], '[' + remoteAddr + ']  ... ', 'FAILED'.red, err);
-          return;
-        }
-
-        remote[process.argv[3]](process.argv.slice(4), {
-          verbose: true,
-          // verbose: {
-          //   stdout: dnodeStream(process.stdout),
-          //   stderr: dnodeStream(process.stderr)
-          // },
-          encoding: 'utf-8'
-        }, function (code, stdout, stderr) {
-          console.log('   ', config.remotes[remoteAddr], '[' + remoteAddr + ']  ... ', (code ? 'FAILED'.red + ' with error code ' + code : 'SUCCESS'.green));
-          d.end();
-          if (code) {
-            console.log('      >', String(stderr).replace(/\n/g, '\n      > '));
-          }
-          next(code);
-        });
+      process.on('SIGINT', function() {
+        remote.choke();
       });
+    
+      connected = true;
+      console.log('   ', prefix, 'connected to ' + remoteAddr);
+      remote.debug('executing ' + JSON.stringify(process.argv[3]) + ' for ' + myIP(null,true));
+      git('log', ['--pretty=format:\'%h\'', '-n', '1'], {}, function (err, stdout, stderr) {
+        remote.load(name, null, String(stdout).replace(/^[\n\s]+|[\n\s]+$/g, ''), function (err) {
+          if (err) {
+            console.log('ERR'.red, prefix, 'error loading module:', err);
+            return;
+          }
+
+          remote[process.argv[3]](process.argv.slice(4), {
+            verbose: true,
+            // verbose: {
+            //   stdout: dnodeStream(process.stdout),
+            //   stderr: dnodeStream(process.stderr)
+            // },
+            encoding: 'utf-8'
+          }, function (code, stdout, stderr) {
+            console.log((code ? 'ERR'.red : 'YAY'.green), prefix, (code ? ('FAILED with error code ' + code).red : 'success!'.green));
+            d.end();
+            if (code) {
+              console.log('    |', String(stderr).replace(/(\n?\s+)+$/, '').replace(/\n/g, '\n    | '));
+            }
+            next(code);
+          });
+        });
+      })
     });
   }, function (err) {
-    process.exit(err);
+    process.on('exit', function () {
+      process.exit(err);
+    });
   });
 } else {
-  console.error('Usage: shypyard client OR shypyard remotetask')
+  console.error('Usage: shypyard client OR shypyard run (remotetask)')
 }
